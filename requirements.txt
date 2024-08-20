@@ -1,0 +1,7 @@
+Flask
+Pillow
+gtts
+moviepy
+pydub
+numpy
+Werkzeug
