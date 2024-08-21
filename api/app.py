@@ -19,12 +19,9 @@ VIDEO_SIZE = (1080, 1920)
 BACKGROUND_INTERVALS = [10, 22, 35]  # Change intervals in seconds for background images
 
 # Configure upload folder and allowed extensions
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = '/tmp'  # Use /tmp for temporary storage
 ALLOWED_EXTENSIONS = {'txt', 'ttf', 'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# Ensure upload folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -38,10 +35,11 @@ def text_to_video(text, font_path, background_images, outputfile):
 
     # Generate speech for the whole text and save as a temporary file
     tts = gTTS(text=text, lang="en")
-    tts.save("temp.mp3")
+    temp_audio_path = os.path.join('/tmp', 'temp.mp3')
+    tts.save(temp_audio_path)
 
     # Measure the speech duration using pydub
-    full_audio = AudioSegment.from_file("temp.mp3")
+    full_audio = AudioSegment.from_file(temp_audio_path)
     full_audio_duration = len(full_audio) / 1000  # duration in seconds
     avg_word_duration = full_audio_duration / len(words)  # average duration per word
 
@@ -76,7 +74,7 @@ def text_to_video(text, font_path, background_images, outputfile):
 
         image_duration += avg_word_duration  # Increment image duration
 
-    audioclip = AudioFileClip("temp.mp3")
+    audioclip = AudioFileClip(temp_audio_path)
     clip = ImageSequenceClip(images, durations=durations)
     clip = clip.set_audio(audioclip)
 
@@ -84,7 +82,7 @@ def text_to_video(text, font_path, background_images, outputfile):
     clip.write_videofile(outputfile, codec="libx264")
 
     # Remove the temporary file
-    os.remove("temp.mp3")
+    os.remove(temp_audio_path)
 
 @app.route("/", methods=["GET", "POST"])
 def upload_file():
@@ -106,7 +104,7 @@ def upload_file():
         # Save the font file
         if font_file and allowed_file(font_file.filename):
             font_filename = secure_filename(font_file.filename)
-            font_path = os.path.join(app.config['UPLOAD_FOLDER'], font_filename)
+            font_path = os.path.join('/tmp', font_filename)
             font_file.save(font_path)
 
         # Save image files
@@ -114,12 +112,12 @@ def upload_file():
         for image in image_files:
             if image and allowed_file(image.filename):
                 image_filename = secure_filename(image.filename)
-                image_path = os.path.join(app.config['UPLOAD_FOLDER'], image_filename)
+                image_path = os.path.join('/tmp', image_filename)
                 image.save(image_path)
                 background_images.append(image_path)
 
         # Generate the video
-        output_filename = f"{uuid.uuid4().hex}.mp4"
+        output_filename = os.path.join('/tmp', f"{uuid.uuid4().hex}.mp4")
         text_to_video(text_content, font_path, background_images, output_filename)
 
         # Redirect to download the video
