@@ -5,3 +5,4 @@ moviepy
 pydub
 numpy
 Werkzeug
+Gunicorn
