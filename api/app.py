@@ -8,11 +8,15 @@ import os
 import uuid
 from werkzeug.utils import secure_filename
 import logging
+import imageio_ffmpeg as ffmpeg
 
 app = Flask(__name__)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+
+# Configure MoviePy to use the imageio-ffmpeg plugin
+os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg.get_ffmpeg_exe()
 
 # Variables for customization
 TEXT_SPEED = 24  # frames per second
