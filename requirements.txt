@@ -6,3 +6,4 @@ pydub
 numpy
 Werkzeug
 Gunicorn
+imageio-ffmpeg
