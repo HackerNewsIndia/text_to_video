@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, render_template, redirect, url_for
+from flask import Flask, request, send_file, redirect, url_for
 from PIL import ImageFont, ImageDraw, Image
 from gtts import gTTS
 from moviepy.editor import ImageSequenceClip, AudioFileClip
@@ -7,8 +7,12 @@ import numpy as np
 import os
 import uuid
 from werkzeug.utils import secure_filename
+import logging
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Variables for customization
 TEXT_SPEED = 24  # frames per second
@@ -19,7 +23,7 @@ VIDEO_SIZE = (1080, 1920)
 BACKGROUND_INTERVALS = [10, 22, 35]  # Change intervals in seconds for background images
 
 # Configure upload folder and allowed extensions
-UPLOAD_FOLDER = '/tmp'  # Use /tmp for temporary storage
+UPLOAD_FOLDER = '/tmp'  # Use /tmp for temporary storage on Vercel
 ALLOWED_EXTENSIONS = {'txt', 'ttf', 'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -86,42 +90,52 @@ def text_to_video(text, font_path, background_images, outputfile):
 
 @app.route("/", methods=["GET", "POST"])
 def upload_file():
-    if request.method == "POST":
-        # Check if the files are present
-        if 'text_file' not in request.files or 'font_file' not in request.files or 'images[]' not in request.files:
-            return 'Missing files', 400
-        
-        # Get the files from the request
-        text_file = request.files['text_file']
-        font_file = request.files['font_file']
-        image_files = request.files.getlist('images[]')
+    try:
+        if request.method == "POST":
+            # Check if the files are present
+            if 'text_file' not in request.files or 'font_file' not in request.files or 'images[]' not in request.files:
+                return 'Missing files', 400
+            
+            # Log files received
+            logging.info(f"Files received: {request.files}")
 
-        # Save the text file
-        if text_file and allowed_file(text_file.filename):
-            text_filename = secure_filename(text_file.filename)
-            text_content = text_file.read().decode("utf-8")
+            # Get the files from the request
+            text_file = request.files['text_file']
+            font_file = request.files['font_file']
+            image_files = request.files.getlist('images[]')
 
-        # Save the font file
-        if font_file and allowed_file(font_file.filename):
-            font_filename = secure_filename(font_file.filename)
-            font_path = os.path.join('/tmp', font_filename)
-            font_file.save(font_path)
+            # Log filenames
+            logging.info(f"Text file: {text_file.filename}, Font file: {font_file.filename}, Images: {[img.filename for img in image_files]}")
 
-        # Save image files
-        background_images = []
-        for image in image_files:
-            if image and allowed_file(image.filename):
-                image_filename = secure_filename(image.filename)
-                image_path = os.path.join('/tmp', image_filename)
-                image.save(image_path)
-                background_images.append(image_path)
+            # Save the text file
+            if text_file and allowed_file(text_file.filename):
+                text_filename = secure_filename(text_file.filename)
+                text_content = text_file.read().decode("utf-8")
 
-        # Generate the video
-        output_filename = os.path.join('/tmp', f"{uuid.uuid4().hex}.mp4")
-        text_to_video(text_content, font_path, background_images, output_filename)
+            # Save the font file
+            if font_file and allowed_file(font_file.filename):
+                font_filename = secure_filename(font_file.filename)
+                font_path = os.path.join('/tmp', font_filename)
+                font_file.save(font_path)
 
-        # Redirect to download the video
-        return redirect(url_for("download_file", filename=output_filename))
+            # Save image files
+            background_images = []
+            for image in image_files:
+                if image and allowed_file(image.filename):
+                    image_filename = secure_filename(image.filename)
+                    image_path = os.path.join('/tmp', image_filename)
+                    image.save(image_path)
+                    background_images.append(image_path)
+
+            # Generate the video
+            output_filename = os.path.join('/tmp', f"{uuid.uuid4().hex}.mp4")
+            text_to_video(text_content, font_path, background_images, output_filename)
+
+            logging.info(f"Video generated: {output_filename}")
+            return redirect(url_for("download_file", filename=output_filename))
+    except Exception as e:
+        logging.error(f"An error occurred: {str(e)}")
+        return f"An error occurred: {str(e)}", 500
 
     return '''
     <!doctype html>
