@@ -9,6 +9,7 @@ import uuid
 from werkzeug.utils import secure_filename
 import logging
 import imageio_ffmpeg as ffmpeg
+import tempfile
 
 app = Flask(__name__)
 
@@ -27,7 +28,7 @@ VIDEO_SIZE = (1080, 1920)
 BACKGROUND_INTERVALS = [10, 22, 35]  # Change intervals in seconds for background images
 
 # Configure upload folder and allowed extensions
-UPLOAD_FOLDER = '/tmp'  # Use /tmp for temporary storage on Vercel
+UPLOAD_FOLDER = tempfile.gettempdir()  # Use temp directory for temporary storage on local
 ALLOWED_EXTENSIONS = {'txt', 'ttf', 'png', 'jpg', 'jpeg'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -39,11 +40,16 @@ def text_to_video(text, font_path, background_images, outputfile):
     images = []
     durations = []
 
+    # Check if the font file exists
+    if not os.path.exists(font_path):
+        logging.error(f"Font file not found: {font_path}")
+        raise FileNotFoundError(f"Font file not found: {font_path}")
+
     fnt = ImageFont.truetype(font_path, FONT_SIZE)
 
     # Generate speech for the whole text and save as a temporary file
     tts = gTTS(text=text, lang="en")
-    temp_audio_path = os.path.join('/tmp', 'temp.mp3')
+    temp_audio_path = os.path.join(UPLOAD_FOLDER, 'temp.mp3')
     tts.save(temp_audio_path)
 
     # Measure the speech duration using pydub
@@ -119,20 +125,23 @@ def upload_file():
             # Save the font file
             if font_file and allowed_file(font_file.filename):
                 font_filename = secure_filename(font_file.filename)
-                font_path = os.path.join('/tmp', font_filename)
+                font_path = os.path.join(UPLOAD_FOLDER, font_filename)
                 font_file.save(font_path)
+                logging.info(f"Font file saved to: {font_path}")
+            else:
+                return 'Invalid font file', 400
 
             # Save image files
             background_images = []
             for image in image_files:
                 if image and allowed_file(image.filename):
                     image_filename = secure_filename(image.filename)
-                    image_path = os.path.join('/tmp', image_filename)
+                    image_path = os.path.join(UPLOAD_FOLDER, image_filename)
                     image.save(image_path)
                     background_images.append(image_path)
 
             # Generate the video
-            output_filename = os.path.join('/tmp', f"{uuid.uuid4().hex}.mp4")
+            output_filename = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}.mp4")
             text_to_video(text_content, font_path, background_images, output_filename)
 
             logging.info(f"Video generated: {output_filename}")
